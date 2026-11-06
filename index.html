@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Home App Launcher</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Home Launcher" />
+  <meta name="application-name" content="Home Launcher" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#1c2621" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    /* On a phone the lobby must scroll like any page; only the TV gets the locked,
+       cursor-free full-screen treatment. `overflow:hidden` here was why phones froze. */
+    html, body { min-height:100%; }
+    @media (min-width:1000px) and (orientation:landscape) {
+      html, body { height:100%; }
+      body { overflow:hidden; cursor:none; }
+    }
+    body {
+      font-family:"DM Sans",system-ui,sans-serif; color:#eef1ea; overflow-y:auto;
+      background:radial-gradient(120% 120% at 80% 0%, #46524a 0%, #2b332e 45%, #1b211d 100%);
+      display:flex; flex-direction:column; align-items:center;
+      padding:clamp(14px,2.6vmin,36px) clamp(14px,3vw,56px);
+    }
+    /* The lobby sits in the middle when it fits and scrolls from its top when it doesn't —
+       centring the body itself cut the first row off whenever the tiles outgrew the screen. */
+    .lobby { width:100%; max-width:1760px; margin:auto 0; display:flex; flex-direction:column; gap:clamp(12px,2vh,26px); }
+    .tv-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px 24px; flex-wrap:wrap; }
+    .tv-clock { font-family:"Manrope",sans-serif; font-weight:800; line-height:1; font-size:clamp(34px,6.2vmin,76px); letter-spacing:-2px; }
+    .tv-greet { color:#b9c4ba; font-size:clamp(13px,1.9vmin,20px); margin-top:6px; }
+    .tv-brand { font-family:"Manrope",sans-serif; font-weight:800; font-size:clamp(15px,2.2vmin,26px); letter-spacing:-.5px; color:#8fc7a3; }
+    .tv-brand b { color:#d8b15e; font-weight:800; }
+    .tv-section + .tv-section { margin-top:clamp(4px,1vmin,12px); }
+    .tv-section h2 { font-family:"Manrope",sans-serif; font-size:clamp(11px,1.35vmin,15px); font-weight:800; letter-spacing:.32em;
+      text-transform:uppercase; color:#93a698; margin:0 0 clamp(8px,1.1vmin,12px) 4px; }
+    .tv-tiles { display:grid; gap:clamp(10px,1.4vmin,18px); grid-template-columns:repeat(auto-fill,minmax(min(100%,max(250px,16.5vw)),1fr)); }
+    .tv-tile {
+      position:relative; display:grid; grid-template-columns:auto 1fr; align-items:center; gap:clamp(12px,1.5vmin,18px);
+      text-decoration:none; color:#eef1ea; min-height:clamp(84px,10.5vmin,124px); padding:clamp(12px,1.5vmin,18px) clamp(14px,1.7vmin,20px);
+      background:linear-gradient(160deg,rgba(255,255,255,.085),rgba(255,255,255,.035)); border:2px solid rgba(255,255,255,.06); border-radius:18px;
+      box-shadow:0 6px 18px rgba(0,0,0,.18); transition:transform .15s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;
+    }
+    .tv-tile:hover { background:linear-gradient(160deg,rgba(255,255,255,.12),rgba(255,255,255,.05)); }
+    .tv-tile:focus { outline:none; border-color:#d8b15e; background:linear-gradient(160deg,rgba(255,255,255,.16),rgba(255,255,255,.07));
+      transform:translateY(-3px) scale(1.025); box-shadow:0 14px 34px rgba(0,0,0,.35),0 0 0 4px rgba(216,177,94,.18); }
+    .tv-tile .badge { width:clamp(48px,6.4vmin,74px); height:clamp(48px,6.4vmin,74px); border-radius:16px; display:grid; place-items:center;
+      background:var(--tint,rgba(143,199,163,.16)); box-shadow:inset 0 0 0 1px rgba(255,255,255,.07); }
+    .tv-tile .icon { font-size:clamp(24px,3.4vmin,40px); line-height:1; }
+    .tv-tile .icon-img { width:62%; height:62%; display:block; }
+    .tv-tile .txt { min-width:0; }
+    .tv-tile strong { display:block; font-family:"Manrope",sans-serif; font-size:clamp(16px,2.1vmin,25px); font-weight:800; line-height:1.15; }
+    .tv-tile .blurb { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+      margin-top:4px; color:#c3cec4; font-size:clamp(12px,1.45vmin,16px); line-height:1.35; }
+    .sec-air  { --tint:rgba(216,177,94,.17); }
+    .sec-home { --tint:rgba(143,199,163,.18); }
+    .sec-tools{ --tint:rgba(150,175,205,.17); }
+    /* The focused channel's full write-up, along the bottom (TV and desktop only). */
+    .tv-detail { display:none; }
+    @media (min-width:1000px) and (orientation:landscape) {
+      .tv-detail { display:grid; grid-template-columns:auto 1fr; gap:4px 18px; align-items:baseline; min-height:clamp(64px,8vmin,96px);
+        padding:clamp(12px,1.5vmin,18px) clamp(16px,2vmin,24px); border-radius:16px; background:rgba(10,16,12,.32); border:1px solid rgba(255,255,255,.06); }
+      .tv-detail strong { font-family:"Manrope",sans-serif; font-weight:800; font-size:clamp(15px,1.9vmin,22px); color:#d8b15e; white-space:nowrap; }
+      .tv-detail p { color:#d6e0d8; font-size:clamp(13px,1.6vmin,18px); line-height:1.45; }
+    }
+    /* Short landscape screens (the Fire Stick's Silk is ~960x540): names only, so the whole lobby fits. */
+    @media (orientation:landscape) and (max-height:620px) {
+      .tv-tiles { grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); }
+      .tv-tile { min-height:0; padding:8px 12px; border-radius:14px; }
+      .tv-tile .badge { width:38px; height:38px; border-radius:11px; }
+      .tv-tile .icon { font-size:21px; }
+      .tv-tile strong { font-size:15px; }
+      .tv-tile .blurb { display:none; }
+      .tv-clock { font-size:34px; }
+      .lobby { gap:10px; }
+      .tv-section h2 { margin-bottom:6px; }
+    }
+    .tv-foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px 18px; }
+    .tv-auto { color:#8ea08f; font-size:clamp(13px,1.7vmin,18px); min-height:1.4em; }
+    .tv-auto.off { visibility:hidden; }
+    .tv-compat { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px 12px; }
+    .tv-compat-label { color:#b9c4ba; font-size:13px; }
+    .tv-compat-link { display:inline-flex; align-items:center; justify-content:center; min-height:44px;
+      padding:9px 15px; border:2px solid rgba(143,199,163,.3); border-radius:999px;
+      color:#e4f0e7; background:rgba(20,35,26,.4); text-decoration:none; font-size:14px; }
+    .tv-compat-link:hover, .tv-compat-link:focus { outline:none; border-color:#d8b15e; background:rgba(255,255,255,.14); }
+    /* Channels play inside this frame so the shell never navigates — that keeps a single
+       fullscreen grant alive across every channel change (TV browsers drop it on navigation). */
+    #stage { position:fixed; inset:0; width:100%; height:100%; border:0; background:#000; display:none; z-index:50; }
+    body.playing #stage { display:block; }
+    body.playing .lobby, body.playing .orb { display:none; }
+    #lobbyBtn { position:fixed; left:1.6vmin; top:1.6vmin; z-index:60; display:none; cursor:pointer;
+      font-family:"DM Sans",system-ui,sans-serif; font-size:clamp(11px,1.5vmin,16px); color:#eef1ea;
+      background:rgba(20,26,22,.55); border:1px solid rgba(255,255,255,.18); border-radius:999px;
+      padding:.7vmin 1.6vmin; opacity:.22; transition:opacity .2s ease; backdrop-filter:blur(4px); }
+    body.playing #lobbyBtn { display:block; }
+    #lobbyBtn:hover, #lobbyBtn:focus { opacity:1; outline:none; }
+    .orb { position:fixed; border-radius:50%; filter:blur(50px); z-index:-1; pointer-events:none; mix-blend-mode:screen; }
+    .orb-a { width:46vmax; height:46vmax; left:-14vmax; top:-18vmax; opacity:.5; background:radial-gradient(circle,#6d8a77,transparent 68%); }
+    .orb-b { width:38vmax; height:38vmax; right:-12vmax; top:6vmax; opacity:.38; background:radial-gradient(circle,#d8b15e,transparent 66%); }
+
+    /* ---- boot intro, ~3.8 s (was 10 s) ---- */
+    #tvIntro { position:fixed; inset:0; z-index:200; display:grid; place-items:center;
+      background:linear-gradient(160deg,#1c2621 0%,#24352b 55%,#1f2b24 100%); overflow:hidden; }
+    #tvIntro.intro-exit { animation:introLift .55s cubic-bezier(.65,0,.35,1) forwards; }
+    @keyframes introLift { to { transform:translateY(-100%); } }
+    #tvIntro .stage { position:relative; display:grid; place-items:center; text-align:center; }
+    .in-orb { position:absolute; border-radius:50%; filter:blur(60px); mix-blend-mode:screen; opacity:0; animation:orbBloom 1.2s ease 0s forwards; }
+    .in-orb.a { width:60vmax; height:60vmax; left:-30vmax; top:-30vmax; background:radial-gradient(circle,#6d8a77,transparent 68%); }
+    .in-orb.b { width:50vmax; height:50vmax; right:-24vmax; bottom:-20vmax; background:radial-gradient(circle,#d8b15e,transparent 66%); animation-delay:.25s; }
+    @keyframes orbBloom { to { opacity:.4; } }
+    .in-drop { position:absolute; top:-16vmin; width:2vmin; height:2vmin; border-radius:50% 50% 50% 0;
+      transform:rotate(-45deg); background:linear-gradient(135deg,#a8d4b8,#6d9a7d); opacity:0;
+      animation:dropFall .55s cubic-bezier(.55,0,.85,.36) .55s forwards; }
+    @keyframes dropFall { 0% { opacity:0; transform:rotate(-45deg) translate(-9vmin,-9vmin); } 15% { opacity:1; } 100% { opacity:0; transform:rotate(-45deg) translate(8vmin,8vmin); } }
+    .in-ripple { position:absolute; width:3vmin; height:3vmin; border:2px solid rgba(143,199,163,.75); border-radius:50%; opacity:0; }
+    .in-ripple.r1 { animation:rippleOut 1.1s ease-out 1.0s forwards; }
+    .in-ripple.r2 { animation:rippleOut 1.3s ease-out 1.15s forwards; }
+    .in-ripple.r3 { animation:rippleOut 1.5s ease-out 1.3s forwards; }
+    @keyframes rippleOut { 0% { opacity:.9; transform:scale(.4); } 100% { opacity:0; transform:scale(10); } }
+    .in-mark { width:11vmin; height:11vmin; display:grid; place-items:center; border-radius:3.2vmin 3.2vmin 3.2vmin 1vmin;
+      background:linear-gradient(135deg,#6d9a7d,#4e7d61); color:#fff; font-size:6vmin; font-weight:800;
+      box-shadow:0 14px 40px rgba(0,0,0,.4); opacity:0; transform:scale(.3);
+      animation:markPop .7s cubic-bezier(.34,1.56,.64,1) 3s forwards; }
+    @keyframes markPop { 60% { box-shadow:0 14px 40px rgba(0,0,0,.4),0 0 0 2.5vmin rgba(143,199,163,.12); } 100% { opacity:1; transform:scale(1); box-shadow:0 14px 40px rgba(0,0,0,.4); } }
+    /* the set arrives, then the picture strikes on like an old CRT */
+    .in-tv { width:32vmin; height:32vmin; opacity:0; transform:scale(.88);
+      animation:tvArrive .55s cubic-bezier(.2,.9,.3,1) .05s forwards;
+      filter:drop-shadow(0 3vmin 5vmin rgba(0,0,0,.55)); }
+    @keyframes tvArrive { to { opacity:1; transform:scale(1); } }
+    .in-tv .scr { fill:#0e1a13; }
+    .in-tv .play { opacity:0; animation:playGlow .5s ease 1.05s forwards; }
+    @keyframes playGlow { to { opacity:1; } }
+    .in-tv .crt { fill:#e6f6ec; transform-box:fill-box; transform-origin:center;
+      transform:scaleY(.02); opacity:0; animation:crtStrike .6s ease-out .55s forwards; }
+    @keyframes crtStrike {
+      0%   { transform:scaleY(.02); opacity:0; }
+      12%  { transform:scaleY(.02); opacity:1; }
+      45%  { transform:scaleY(.08); opacity:1; }
+      100% { transform:scaleY(1);   opacity:0; }
+    }
+    .in-word { margin-top:3vmin; font-family:Manrope,sans-serif; font-weight:800; font-size:12vmin; letter-spacing:-.4vmin; color:#fff; }
+    .in-word i { font-style:normal; display:inline-block; opacity:0; transform:translateY(5vmin); animation:letterUp .45s cubic-bezier(.2,.8,.2,1) forwards; }
+    .in-word i.dew { color:#8fc7a3; }
+    .in-word i:nth-child(1) { animation-delay:1.2s; } .in-word i:nth-child(2) { animation-delay:1.26s; }
+    .in-word i:nth-child(3) { animation-delay:1.32s; } .in-word i:nth-child(4) { animation-delay:1.38s; }
+    .in-word i:nth-child(5) { animation-delay:1.44s; } .in-word i:nth-child(6) { animation-delay:1.5s; }
+    .in-word i:nth-child(7) { animation-delay:1.56s; }
+    @keyframes letterUp { to { opacity:1; transform:translateY(0); } }
+    .in-tag { margin-top:2vmin; color:#93a698; font-size:2.2vmin; font-weight:700; letter-spacing:.8vmin; text-transform:uppercase; opacity:0; animation:introFade .6s ease 1.95s forwards; }
+    .in-greet { margin-top:4vmin; color:#d6e0d8; font-family:Manrope,sans-serif; font-size:3vmin; font-weight:600; opacity:0; animation:introFade .6s ease 2.35s forwards; }
+    @keyframes introFade { to { opacity:1; } }
+    @media (prefers-reduced-motion: reduce) { #tvIntro { display:none; } }
+  </style>
+<link rel="stylesheet" href="/design.css?v=20260905">
+<script src="/design.js?v=20260905" defer></script>
+</head>
+<body>
+  <div id="tvIntro" aria-hidden="true">
+    <span class="in-orb a"></span><span class="in-orb b"></span>
+    <div class="stage">
+      <svg class="in-tv" viewBox="0 0 512 512" aria-hidden="true">
+        <defs>
+          <linearGradient id="introBrass" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f0d494"/><stop offset="100%" stop-color="#bd8d3a"/>
+          </linearGradient>
+        </defs>
+        <g stroke="url(#introBrass)" stroke-width="13" stroke-linecap="round" fill="none">
+          <path d="M256 172 L166 74"/><path d="M256 172 L346 74"/>
+        </g>
+        <circle cx="166" cy="74" r="13" fill="url(#introBrass)"/>
+        <circle cx="346" cy="74" r="13" fill="url(#introBrass)"/>
+        <rect x="74" y="168" width="364" height="252" rx="40" fill="#22302a"
+              stroke="url(#introBrass)" stroke-width="15"/>
+        <rect class="scr" x="110" y="204" width="252" height="180" rx="22"/>
+        <path class="play" d="M212 254 L212 334 L286 294 Z" fill="#8fc7a3"/>
+        <rect class="crt" x="110" y="204" width="252" height="180" rx="6"/>
+        <circle cx="399" cy="248" r="19" fill="none" stroke="url(#introBrass)" stroke-width="11"/>
+        <circle cx="399" cy="316" r="19" fill="none" stroke="url(#introBrass)" stroke-width="11"/>
+        <path d="M138 420 L120 456" stroke="url(#introBrass)" stroke-width="15" stroke-linecap="round"/>
+        <path d="M374 420 L392 456" stroke="url(#introBrass)" stroke-width="15" stroke-linecap="round"/>
+      </svg>
+      <div class="in-word"><i class="dew">H</i><i class="dew">o</i><i class="dew">m</i><i class="dew">e</i></div>
+      <p class="in-tag">Every app, one screen</p>
+      <p class="in-greet" id="introGreet"></p>
+    </div>
+  </div>
+  <div class="orb orb-a"></div><div class="orb orb-b"></div>
+  <main class="lobby">
+    <header class="tv-head">
+      <div><div class="tv-clock" id="clock">--:--</div><div class="tv-greet" id="greet"></div></div>
+      <div class="tv-brand">Home <b>Launcher</b></div>
+    </header>
+    <div id="sections"></div>
+    <div class="tv-detail" id="detail" aria-live="polite"><strong id="detailName"></strong><p id="detailDesc"></p></div>
+    <footer class="tv-foot">
+      <p class="tv-auto" id="autoNote"></p>
+    </footer>
+  </main>
+  <iframe id="stage" title="Channel" allowfullscreen allow="autoplay; fullscreen"></iframe>
+  <button id="lobbyBtn">&#9664; Lobby</button>
+  <script>
+    // Add a tile = add a line here.
+    const APPS = [
+      { icon:"🔄", name:"The Rotation", sec:"air", blurb:"Every channel in turn, three minutes each.", rotate:true, url:"#rotate",
+        desc:"Sit back and let the screen run itself: every channel below in turn, three minutes each, round the clock." },
+      { icon:"📈", name:"Market Wall", sec:"air", blurb:"Markets, headlines, scores and weather.", url:"channels/sample.html?c=Market%20Wall",
+        desc:"A ticker wall with markets, headlines, scores and weather across rotating pages." },
+      { icon:"🐦", name:"Backyard Radio", sec:"home", blurb:"A microphone names every bird it hears.", url:"channels/sample.html?c=Backyard%20Radio",
+        desc:"A microphone listens all day and names what it hears, using an open-source audio model." },
+      { icon:"📔", name:"Bird Log", sec:"home", blurb:"Every bird heard, and when.", url:"channels/sample.html?c=Bird%20Log",
+        desc:"Every species identified so far, with the hours they call and the months they appear." },
+      { icon:"🔭", name:"Ceiling Sky", sec:"air", blurb:"A planetarium for the ceiling.", url:"channels/sample.html?c=Ceiling%20Sky",
+        desc:"Tonight\u2019s real sky for a projector: the first stars, a guided tour, then star trails to dawn." },
+      { icon:"🌙", name:"Last Night", sec:"home", blurb:"Sleep, drawn as a landscape.", url:"channels/sample.html?c=Last%20Night",
+        desc:"A night of sleep from a fitness tracker, drawn as a landscape of ridgelines." },
+      { icon:"🌌", name:"Night Almanac", sec:"air", blurb:"Tonight\u2019s sky as an engraved page.", url:"channels/sample.html?c=Night%20Almanac",
+        desc:"The moon at its true phase, sunset, sunrise and passing satellites as an almanac page." },
+      { icon:"🌳", name:"Family Tree", sec:"home", blurb:"Generations, one tap at a time.", url:"channels/sample.html?c=Family%20Tree",
+        desc:"A searchable family tree that works by touch, mouse or TV remote." },
+      { icon:"🚙", name:"Project Car", sec:"home", blurb:"A 3D model with every build option.", url:"channels/sample.html?c=Project%20Car",
+        desc:"A restoration project in 3D, with each open decision as a live option." },
+      { icon:"✓", name:"Tasks", sec:"tools", blurb:"Today\u2019s focus, goals and lists.", url:"channels/sample.html?c=Tasks",
+        desc:"The task app, the same one that runs on the phone." },
+      { icon:"🧠", name:"Second Brain", sec:"tools", blurb:"Live project status.", url:"channels/sample.html?c=Second%20Brain",
+        desc:"Project status and open decisions, pushed here from a personal knowledge base." }
+    ];
+    // Idle at the lobby -> drift to the station. Any button press cancels.
+    const AUTO_LAUNCH_SECONDS = 300;              // 5 minutes
+    const AUTO_LAUNCH_NAME = "Backyard Radio";     // which channel it settles on
+    // "The Rotation" channel: these, in this order, on a timer.
+    const ROTATION = ["Market Wall", "Backyard Radio", "Ceiling Sky", "Last Night", "Night Almanac"];
+    const ROTATE_MINUTES = 3;
+
+    // Lobby sections, in this order; each app's `sec` puts it in one.
+    const SECTIONS = [["air","On the air"],["home","Around the house"],["tools","Tools"]];
+    document.getElementById("sections").innerHTML = SECTIONS.map(([key,label]) =>
+      `<section class="tv-section sec-${key}"><h2>${label}</h2><nav class="tv-tiles">` +
+      APPS.filter(a => a.sec === key).map(a =>
+        `<a class="tv-tile" href="${a.url}" data-app="${APPS.indexOf(a)}">` +
+        `<span class="badge">${a.img ? `<img class="icon-img" src="${a.img}" alt="">` : `<span class="icon">${a.icon}</span>`}</span>` +
+        `<span class="txt"><strong>${a.name}</strong><span class="blurb">${a.blurb}</span></span></a>`).join("") +
+      `</nav></section>`).join("");
+    const primaryTiles = [...document.querySelectorAll(".tv-tile")];
+    const detailName = document.getElementById("detailName"), detailDesc = document.getElementById("detailDesc");
+    primaryTiles.forEach(t => t.addEventListener("focus", () => {
+      const a = APPS[+t.dataset.app]; detailName.textContent = a.name; detailDesc.textContent = a.desc;
+      t.scrollIntoView({ block:"nearest" });
+    }));
+    detailName.textContent = APPS[0].name; detailDesc.textContent = APPS[0].desc;   // until something takes focus
+    const tvLinks = [...document.querySelectorAll(".tv-compat-link")];
+    // The remote's arrow keys reach the TV shortcuts as well as the regular tiles.
+    const tiles = [...primaryTiles, ...tvLinks];
+    tiles[0].focus();
+
+    // Open a channel inside the shell rather than navigating to it.
+    const stage = document.getElementById("stage");
+    let rotateTimer = null, rotateIdx = 0;
+    function stopRotation() { if (rotateTimer) { clearInterval(rotateTimer); rotateTimer = null; } }
+    function nextRotation() {
+      const app = APPS.find(a => a.name === ROTATION[rotateIdx % ROTATION.length]);
+      rotateIdx++;
+      if (app) stage.src = app.url;
+    }
+    function openChannel(app) {
+      cancelAuto();
+      if (app.standalone) { location.href = app.url; return; }
+      // Phones and tablets: WebKit mangles taps and blocks audio inside framed
+      // pages, so go to the channel for real — every channel has a button back
+      // to the lobby. TVs keep the iframe so the fullscreen grant survives.
+      if (matchMedia("(pointer: coarse)").matches && !app.rotate) {
+        location.href = app.url;
+        return;
+      }
+      goFullscreen();                 // a click is a real gesture, so this is granted
+      stopRotation();
+      document.body.classList.add("playing");
+      if (app.rotate) {               // the channel that is all the channels
+        rotateIdx = 0; nextRotation();
+        rotateTimer = setInterval(nextRotation, ROTATE_MINUTES * 60000);
+        return;
+      }
+      stage.src = app.url;
+    }
+    primaryTiles.forEach(t => t.addEventListener("click", e => { e.preventDefault(); openChannel(APPS[+t.dataset.app]); }));
+    tvLinks.forEach(t => t.addEventListener("click", e => {
+      e.preventDefault(); openChannel({ name:t.textContent, url:t.getAttribute("href") });
+    }));
+    document.getElementById("lobbyBtn").addEventListener("click", e => {
+      e.stopPropagation();
+      stopRotation();
+      document.body.classList.remove("playing");
+      stage.src = "about:blank";
+      autoLeft = AUTO_LAUNCH_SECONDS; startAuto(); tiles[0].focus();
+    });
+
+    function tick() {
+      const now = new Date();
+      document.getElementById("clock").textContent =
+        now.toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
+      const h = now.getHours();
+      document.getElementById("greet").textContent =
+        (h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening") + " — " +
+        now.toLocaleDateString(undefined, { weekday:"long", month:"long", day:"numeric" });
+    }
+    tick(); setInterval(tick, 15000);
+
+    // D-pad: arrows move between tiles, Enter follows the focused link.
+    // Browsers only grant fullscreen from a real gesture — take the first one we get,
+    // which on the Fire Stick hides Silk's toolbar and gives the whole screen back.
+    function goFullscreen() {
+      try {
+        if (!document.fullscreenElement) {
+          const pending = document.documentElement.requestFullscreen?.();
+          if (pending && pending.catch) pending.catch(() => {});
+        }
+      } catch {}
+    }
+    document.addEventListener("keydown", e => {
+      goFullscreen();
+      if (introRunning) { e.preventDefault(); endIntro(); return; } // any button skips the intro
+      cancelAuto();
+      const dir = { ArrowRight:[1,0], ArrowLeft:[-1,0], ArrowDown:[0,1], ArrowUp:[0,-1] }[e.key];
+      if (!dir) return;
+      e.preventDefault();
+      const cur = tiles.includes(document.activeElement) ? document.activeElement : null;
+      if (!cur) { tiles[0].focus(); return; }
+      // Move across the grid: the nearest tile in the pressed direction, favouring the same row or column.
+      const c = r => [r.left + r.width / 2, r.top + r.height / 2], [cx, cy] = c(cur.getBoundingClientRect());
+      let best = null, bestScore = Infinity;
+      for (const t of tiles) {
+        if (t === cur) continue;
+        const [x, y] = c(t.getBoundingClientRect()), dx = x - cx, dy = y - cy;
+        const along = dx * dir[0] + dy * dir[1], across = Math.abs(dx * dir[1] + dy * dir[0]);
+        if (along <= 4) continue;
+        const score = along + across * 2.2;
+        if (score < bestScore) { bestScore = score; best = t; }
+      }
+      if (!best) {                                   // off the edge: wrap through the list
+        const i = tiles.indexOf(cur), step = dir[0] + dir[1];
+        best = tiles[(i + step + tiles.length) % tiles.length];
+      }
+      best.focus();
+    });
+    document.addEventListener("click", () => { goFullscreen(); if (introRunning) endIntro(); else cancelAuto(); }, true);
+
+    const autoApp = APPS.find(a => a.name === AUTO_LAUNCH_NAME) || APPS[0];
+    let autoLeft = AUTO_LAUNCH_SECONDS, autoTimer = null;
+    const note = document.getElementById("autoNote");
+    function cancelAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; note.classList.add("off"); } }
+    function stepAuto() {
+      // stay quiet until the last minute, then count down
+      if (autoLeft <= 60) {
+        note.classList.remove("off");
+        note.textContent = "Tuning to " + autoApp.name + " in " + autoLeft + "s — press any button to stay";
+      } else { note.classList.add("off"); }
+      if (autoLeft-- <= 0) { openChannel(autoApp); }
+    }
+    function startAuto() { if (!autoTimer) { autoTimer = setInterval(stepAuto, 1000); stepAuto(); } }
+
+    /* ---- boot intro, 3.8 s (skips on any button; countdown starts after) ---- */
+    const INTRO_MS = 3800;
+    let introRunning = true, introTimeout = null;
+    const introEl = document.getElementById("tvIntro");
+    function endIntro() {
+      if (!introRunning) return;
+      introRunning = false; clearTimeout(introTimeout);
+      introEl.classList.add("intro-exit");
+      setTimeout(() => { introEl.remove(); tiles[0].focus(); startAuto(); }, 560);
+    }
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) { introEl.remove(); introRunning = false; startAuto(); }
+    else {
+      const h = new Date().getHours();
+      document.getElementById("introGreet").textContent =
+        (h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening");
+      playIntroSound();
+      introTimeout = setTimeout(endIntro, INTRO_MS);
+    }
+
+    // Slow, soft intro: a muffled drop and a low chord that swells and fades over
+    // the whole ident — meant to be barely-there rather than a chime.
+    // Silently does nothing if autoplay is blocked (enable Autoplay Audio in Fully Kiosk).
+    function playIntroSound() {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext; if (!Ctx) return;
+        const ctx = new Ctx();
+        if (ctx.state === "suspended") ctx.resume().catch(() => {});
+        const now = ctx.currentTime;
+        const master = ctx.createGain(); master.gain.value = .45;
+        const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 900; lp.Q.value = .3;
+        master.connect(lp); lp.connect(ctx.destination);
+        // the drop: soft, low, slow to fade
+        const o0 = ctx.createOscillator(), g0 = ctx.createGain();
+        o0.type = "sine";
+        o0.frequency.setValueAtTime(560, now + 1.0);
+        o0.frequency.exponentialRampToValueAtTime(196, now + 1.5);
+        g0.gain.setValueAtTime(.0001, now + 1.0);
+        g0.gain.exponentialRampToValueAtTime(.05, now + 1.12);
+        g0.gain.exponentialRampToValueAtTime(.0001, now + 2.4);
+        o0.connect(g0); g0.connect(master); o0.start(now + 1.0); o0.stop(now + 2.6);
+        // low open chord, entries staggered, very long attack and release
+        [[130.8,0],[196,.3],[261.6,.6],[329.6,.9]].forEach(([f,d]) => {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.type = "sine"; o.frequency.value = f;
+          const t = now + 1.1 + d;
+          g.gain.setValueAtTime(.0001, t);
+          g.gain.exponentialRampToValueAtTime(.024, t + .9);
+          g.gain.exponentialRampToValueAtTime(.0001, t + 3.6);
+          o.connect(g); g.connect(master); o.start(t); o.stop(t + 3.8);
+        });
+      } catch {}
+    }
+  </script>
+</body>
+</html>
