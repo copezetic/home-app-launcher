@@ -2,7 +2,9 @@
 
 One full-screen launcher for every app in my house. It runs on TVs, phones and laptops, and works with a TV remote, touch or a mouse.
 
-![The launcher](screenshot.png)
+[![Home App Launcher video](media/home-app-launcher.gif)](https://copezetic.github.io/home-app-launcher/media/home-app-launcher.mp4)
+
+This video shows the real launcher with my real apps. [Open the full video](https://copezetic.github.io/home-app-launcher/media/home-app-launcher.mp4) or [try the sample version](https://copezetic.github.io/home-app-launcher/).
 
 I direct this work through Claude Code and own the design, testing and upkeep.
 
@@ -18,4 +20,6 @@ Adding an app is one line in the `APPS` list.
 
 ## This version
 
-The real apps are private, so each tile opens a placeholder in `channels/sample.html`. Open `index.html` in a browser to try it. No build step is needed.
+![The sample launcher](screenshot.png)
+
+The real apps are private, so each tile here opens a placeholder in `channels/sample.html`. Open `index.html` in a browser to try it. No build step is needed.
